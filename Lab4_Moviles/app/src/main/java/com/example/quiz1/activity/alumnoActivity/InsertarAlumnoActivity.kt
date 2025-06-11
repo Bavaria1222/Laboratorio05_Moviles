@@ -4,13 +4,12 @@ import android.app.Activity
 import android.os.Bundle
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
-import com.example.gestionacademicaapp.model.Alumno
 import com.example.quiz1.R
-import com.example.quiz1.api.AlumnoApi
-import com.example.quiz1.api.ApiClient
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
+import androidx.lifecycle.lifecycleScope
+import com.example.quiz1.data.local.db.AppDatabase
+import com.example.quiz1.data.local.entity.AlumnoEntity
+import com.example.quiz1.data.repository.AlumnoRepository
+import kotlinx.coroutines.launch
 
 class InsertarAlumnoActivity : AppCompatActivity() {
 
@@ -22,7 +21,7 @@ class InsertarAlumnoActivity : AppCompatActivity() {
     private lateinit var edtIdCarrera: EditText
     private lateinit var btnGuardar: Button
 
-    private val api = ApiClient.retrofit.create(AlumnoApi::class.java)
+    private lateinit var repository: AlumnoRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,11 +35,14 @@ class InsertarAlumnoActivity : AppCompatActivity() {
         edtIdCarrera = findViewById(R.id.edtIdCarrera)
         btnGuardar = findViewById(R.id.btnGuardar)
 
+        val db = AppDatabase.getDatabase(this)
+        repository = AlumnoRepository(db.alumnoDao())
+
         btnGuardar.setOnClickListener { insertarAlumno() }
     }
 
     private fun insertarAlumno() {
-        val alumno = Alumno(
+        val alumno = AlumnoEntity(
             idAlumno = 0,
             cedula = edtCedula.text.toString(),
             nombre = edtNombre.text.toString(),
@@ -49,31 +51,15 @@ class InsertarAlumnoActivity : AppCompatActivity() {
             fechaNacimiento = edtFechaNacimiento.text.toString(),
             idCarrera = edtIdCarrera.text.toString().toIntOrNull() ?: 0
         )
-        api.insertar(alumno).enqueue(object : Callback<Void> {
-            override fun onResponse(call: Call<Void>, response: Response<Void>) {
-                if (response.isSuccessful) {
-                    Toast.makeText(
-                        this@InsertarAlumnoActivity,
-                        "Alumno insertado correctamente",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    setResult(Activity.RESULT_OK)
-                    finish()
-                } else {
-                    Toast.makeText(
-                        this@InsertarAlumnoActivity,
-                        "Error al insertar alumno",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
-            override fun onFailure(call: Call<Void>, t: Throwable) {
-                Toast.makeText(
-                    this@InsertarAlumnoActivity,
-                    "Fallo: ${t.message}",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-        })
+        lifecycleScope.launch {
+            repository.insertar(alumno)
+            Toast.makeText(
+                this@InsertarAlumnoActivity,
+                "Alumno insertado correctamente",
+                Toast.LENGTH_SHORT
+            ).show()
+            setResult(Activity.RESULT_OK)
+            finish()
+        }
     }
 }

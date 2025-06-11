@@ -6,12 +6,11 @@ import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.example.quiz1.R
-import com.example.quiz1.api.ApiClient
-import com.example.quiz1.api.CursoApi
-import com.example.quiz1.model.Curso
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
+import androidx.lifecycle.lifecycleScope
+import com.example.quiz1.data.local.db.AppDatabase
+import com.example.quiz1.data.local.entity.CursoEntity
+import com.example.quiz1.data.repository.CursoRepository
+import kotlinx.coroutines.launch
 
 class InsertarCursoActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -24,26 +23,27 @@ class InsertarCursoActivity : AppCompatActivity() {
         val edtHoras = findViewById<EditText>(R.id.edtHorasCurso)
         val btnGuardar = findViewById<Button>(R.id.btnGuardarCurso)
 
+        val db = AppDatabase.getDatabase(this)
+        val repository = CursoRepository(db.cursoDao())
+
         btnGuardar.setOnClickListener {
-            val nuevoCurso = Curso(
-                0,
-                edtCodigo.text.toString(),
-                edtNombre.text.toString(),
-                edtCreditos.text.toString().toIntOrNull() ?: 0,
-                edtHoras.text.toString().toIntOrNull() ?: 0
+            val nuevoCurso = CursoEntity(
+                idCurso = 0,
+                codigo = edtCodigo.text.toString(),
+                nombre = edtNombre.text.toString(),
+                creditos = edtCreditos.text.toString().toIntOrNull() ?: 0,
+                horasSemanales = edtHoras.text.toString().toIntOrNull() ?: 0
             )
 
-            val call = ApiClient.retrofit.create(CursoApi::class.java).insertar(nuevoCurso)
-            call.enqueue(object : Callback<Void> {
-                override fun onResponse(call: Call<Void>, response: Response<Void>) {
-                    Toast.makeText(this@InsertarCursoActivity, "Curso insertado", Toast.LENGTH_SHORT).show()
-                    finish()
-                }
-
-                override fun onFailure(call: Call<Void>, t: Throwable) {
-                    Toast.makeText(this@InsertarCursoActivity, "Error al insertar", Toast.LENGTH_SHORT).show()
-                }
-            })
+            lifecycleScope.launch {
+                repository.insertar(nuevoCurso)
+                Toast.makeText(
+                    this@InsertarCursoActivity,
+                    "Curso insertado",
+                    Toast.LENGTH_SHORT
+                ).show()
+                finish()
+            }
         }
     }
 }
