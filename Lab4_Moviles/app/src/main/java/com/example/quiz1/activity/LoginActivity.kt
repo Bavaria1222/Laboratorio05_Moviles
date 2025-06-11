@@ -6,12 +6,9 @@ import android.os.Bundle
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import com.example.quiz1.R
-import com.example.quiz1.api.ApiClient
-import com.example.quiz1.api.LoginApi
-import com.example.quiz1.model.Usuario
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
+import androidx.lifecycle.lifecycleScope
+import com.example.quiz1.data.local.db.AppDatabase
+import com.example.quiz1.data.repository.UsuarioRepository
 
 class LoginActivity : AppCompatActivity() {
 
@@ -25,7 +22,9 @@ class LoginActivity : AppCompatActivity() {
         val tvRegistro = findViewById<TextView>(R.id.tvRegistro)
 
         val prefs = getSharedPreferences("datos_usuario", MODE_PRIVATE)
-        val api = ApiClient.retrofit.create(LoginApi::class.java)
+
+        val db = AppDatabase.getDatabase(this)
+        val repository = UsuarioRepository(db.usuarioDao())
 
         btnLogin.setOnClickListener {
             val cedula = etCedula.text.toString()
@@ -33,29 +32,19 @@ class LoginActivity : AppCompatActivity() {
             if (cedula.isBlank() || clave.isBlank()) {
                 Toast.makeText(this, "Complete los campos", Toast.LENGTH_SHORT).show()
             } else {
-                val usuario = Usuario(cedula, clave, "")
-                api.login(usuario).enqueue(object : Callback<Usuario> {
-                    override fun onResponse(call: Call<Usuario>, response: Response<Usuario>) {
-                        if (response.isSuccessful) {
-                            val user = response.body() ?: return
-                            // Guardamos el rol en mayúsculas para que el menú
-                            // pueda evaluarlo sin depender del formato que
-                            // envíe el API.
-                            prefs.edit()
-                                .putString("cedula", user.cedula)
-                                .putString("rol", user.rol.uppercase())
-                                .apply()
-                            startActivity(Intent(this@LoginActivity, MenuActivity::class.java))
-                            finish()
-                        } else {
-                            Toast.makeText(this@LoginActivity, "Credenciales inválidas", Toast.LENGTH_SHORT).show()
-                        }
+                lifecycleScope.launch {
+                    val user = repository.loginLocal(cedula, clave)
+                    if (user != null) {
+                        prefs.edit()
+                            .putString("cedula", user.cedula)
+                            .putString("rol", user.rol.uppercase())
+                            .apply()
+                        startActivity(Intent(this@LoginActivity, MenuActivity::class.java))
+                        finish()
+                    } else {
+                        Toast.makeText(this@LoginActivity, "Credenciales inválidas", Toast.LENGTH_SHORT).show()
                     }
-
-                    override fun onFailure(call: Call<Usuario>, t: Throwable) {
-                        Toast.makeText(this@LoginActivity, "Error: ${t.message}", Toast.LENGTH_SHORT).show()
-                    }
-                })
+                }
             }
         }
 
